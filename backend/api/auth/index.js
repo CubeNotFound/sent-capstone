@@ -1,6 +1,7 @@
 import express from "express";
 import { getUIDByCredentials, newSession, deleteSession, getUidBySessionId } from "../../db/auth.js";
 import { getDbConnection } from "../../db/index.js";
+import { insertUser } from "../../db/user.js";
 
 export const authRouter = express.Router();
 
@@ -48,3 +49,103 @@ authRouter.post("/logout", async (req, res) => {
   deleteSession(db, sessionId);
   res.status(200).send();
 });
+
+authRouter.post("/register", async (req, res) => {
+  const validationError = validateUser(req.body);
+  if (validationError) {
+    res.status(400).send(validationError);
+    return;
+  }
+
+  const db = getDbConnection();
+  try {
+    const existingUser = await getUserByUsername(db, req.body.username)
+    if (existingUser) {
+      res.status(400).send("Username already in use");
+      return;
+    }
+    await insertUser(db, req.body);
+  } catch (error) {
+    console.log("Error creating user: ", error)
+    res.status(500).send("Internal error");
+    return;
+  }
+
+  res.status(201).send();
+});
+
+const USERNAME_PATTER = /^[a-zA-Z0-9._-]{3,20}$/;
+const NAME_PATTER = /^[a-zA-Z ]{1,49}$/;  
+const GENDERS = ['male', 'female']
+
+function validateUser(user) {
+  for (const field of ["firstName", "lastName", "username", "password", "gender"]) {
+    if (typeof user[field] !== "string" || !user[field]) {
+      return `${field} is required`
+    }
+  }
+ 
+  if (!NAME_PATTERN.test(user.firstName)) {
+    return "First name must start with a letter and be up to 50 letters, spaces, hyphens or apostrophes"
+  }
+ 
+  if (!NAME_PATTERN.test(user.lastName)) {
+    return "Last name must start with a letter and be up to 50 letters, spaces, hyphens or apostrophes"
+  }
+ 
+  if (!USERNAME_PATTERN.test(user.username)) {
+    return "Username must be 3-20 characters and only contain letters, numbers, dots, userscores or hyphens. "
+  }
+ 
+  const passwordError = validatePassword(user.password)
+  if (passwordError) {
+    return passwordError;
+  }
+ 
+  if (!GENDERS.includes(user.gender)) {
+    return `Gender must be one of ${GENDERS.join(", ")}.`
+  }
+ 
+  if (!isValidAvatarUrl(user.avatarUrl)) {
+    return `Avatar URL must be a valid URL`
+  }
+ 
+  return null;
+}
+ 
+function validatePassword(password) {
+  if (password.length < 8 || password.length > 20) {
+    return `Password must be between 8 and 20 characters.`
+  }
+ 
+  if (!/[A-Z]/.test(password)) {
+    return `Password must contain at least one uppercase letter.`
+  }
+ 
+  if (!/[a-z]/.test(password)) {
+    return `Password must contain at least one uppercase letter.`
+  }
+ 
+  if (!/[0-9]/.test(password)) {
+    return `Password must contain at least one uppercase letter.`
+  }
+ 
+  return null;
+}
+ 
+const MAX_URL_LENGTH = 2048
+ 
+function isValidAvatarUrl(avatarUrl) {
+  if (avatarUrl.length > MAX_URL_LENGTH) { return false }
+ 
+  if (!avatarUrl) {
+    return true;
+  }
+ 
+  try {
+    const { protocol } = new URL(avatarUrl);
+    return protocol === "http:" || protocol === "https:"
+  } catch {
+    return false;
+  }
+}

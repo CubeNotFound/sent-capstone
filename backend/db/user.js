@@ -52,3 +52,29 @@ export function getUserById(db, id) {
     });
   });
 }
+
+/**
+ * @param {sqlite3.Database} db
+ */
+export function getUserByUsername(db, username) {
+  return new Promise((resolve, reject) => {
+    db.get(`SELECT id, firstName, lastName, gender, avatarUrl
+                  FROM users WHERE username = ?`, [username], (err, row) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(row);
+    });
+  });
+}
+
+/**
+ * @param {sqlite3.Database} db
+ * @param {{firstName: string, lastName: string, username: string, password: string, gender: string, avatarUrl: string}} user
+ */
+export function insertUser(db, id) {
+  return new Promise((resolve, reject) => {
+    db.all('INSERT into users (firstName, lastName, username, password, gender, avatarUrl) VALUES (?, ?, ?, ?, ?, ?)', [user.firstName, user.lastName, user.username, user.password, user.gender, user.avatarUrl]);
+  });
+}
